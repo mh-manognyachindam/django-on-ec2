@@ -13,7 +13,8 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                withCredentials([string(credentialsId: 'git-repo-token', variable: 'GITHUB_TOKEN')]) {
+               withCredentials([string(credentialsId: 'b4c1fbc7-306d-416a-8c34-1fb51efbf633', variable: 'GITHUB_TOKEN')]) {
+
                     sh '''
                     echo "Cloning repository..."
                     rm -rf to-do-list-practise  # Clean previous build if exists
