@@ -8,24 +8,12 @@ pipeline {
         EC2_HOST = '35.172.114.8'
         APP_DIR = '/home/ubuntu/todo-app'
         PYTHON_BIN = '/usr/bin/python3'
-        GITHUB_TOKEN = "${env.GITHUB_TOKEN}"  // Using system environment variable
     }
 
     stages {
         stage('Checkout Code') {
             steps {
                 checkout scm
-            }
-        }
-
-        stage('Clone Repository') {
-            steps {
-                sh '''
-                echo "Cloning repository..."
-                rm -rf django-on-ec2
-                git clone https://$GITHUB_TOKEN@github.com/mh-manognyachindam/django-on-ec2.git
-                cd django-on-ec2
-                '''
             }
         }
 
@@ -45,7 +33,7 @@ pipeline {
                     sh '''
                     echo "Transferring application files to EC2..."
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
-                    scp -o StrictHostKeyChecking=no -r django-on-ec2/* $EC2_USER@$EC2_HOST:$APP_DIR
+                    scp -o StrictHostKeyChecking=no -r * $EC2_USER@$EC2_HOST:$APP_DIR
 
                     echo "Running pylint.sh on EC2..."
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
