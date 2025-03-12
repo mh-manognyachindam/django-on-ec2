@@ -11,6 +11,12 @@ pipeline {
     }
 
     stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Clone Repository') {
             steps {
                withCredentials([string(credentialsId: 'todo-github', variable: 'GITHUB_TOKEN')]) {
