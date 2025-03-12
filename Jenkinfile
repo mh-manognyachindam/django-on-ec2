@@ -36,7 +36,7 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['858d053b-55ec-4c46-9cb6-22f757cae15c']) {
+                sshagent(['d1c7a6e0-3239-4488-a6da-520ac8757e2b']) {
                     sh '''
                     echo "Transferring application files to EC2..."
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
