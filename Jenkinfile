@@ -8,6 +8,7 @@ pipeline {
         EC2_HOST = '35.172.114.8'
         APP_DIR = '/home/ubuntu/todo-app'
         PYTHON_BIN = '/usr/bin/python3'
+        GITHUB_TOKEN = "${env.GITHUB_TOKEN}"  // Using system environment variable
     }
 
     stages {
@@ -19,14 +20,12 @@ pipeline {
 
         stage('Clone Repository') {
             steps {
-               withCredentials([string(credentialsId: 'b4c1fbc7-306d-416a-8c34-1fb51efbf633', variable: 'GITHUB_TOKEN')]) {
-                    sh '''
-                    echo "Cloning repository..."
-                    rm -rf django-on-ec2
-                    git clone https://$GITHUB_TOKEN@github.com/mh-manognyachindam/django-on-ec2.git
-                    cd django-on-ec2
-                    '''
-                }
+                sh '''
+                echo "Cloning repository..."
+                rm -rf django-on-ec2
+                git clone https://$GITHUB_TOKEN@github.com/mh-manognyachindam/django-on-ec2.git
+                cd django-on-ec2
+                '''
             }
         }
 
