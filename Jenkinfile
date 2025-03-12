@@ -11,13 +11,13 @@ pipeline {
     }
 
     stages {
+
         stage('Clone Repository') {
             steps {
-               withCredentials([string(credentialsId: 'b4c1fbc7-306d-416a-8c34-1fb51efbf633', variable: 'GITHUB_TOKEN')]) {
-
+                withCredentials([string(credentialsId: 'todo-github', variable: 'GITHUB_TOKEN')]) {
                     sh '''
                     echo "Cloning repository..."
-                    rm -rf to-do-list-practise  # Clean previous build if exists
+                    rm -rf django-on-ec2  # Clean previous build if exists
                     git clone https://$GITHUB_TOKEN@github.com/mh-manognyachindam/django-on-ec2.git
                     cd django-on-ec2
                     '''
