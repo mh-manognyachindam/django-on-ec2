@@ -1,0 +1,66 @@
+pipeline {
+    agent { label 'testing-lable' }
+
+    environment {
+        AWS_ACCOUNT_ID = '000629889765'
+        AWS_REGION = 'us-east-1'
+        EC2_USER = 'ubuntu'
+        EC2_HOST = '35.172.114.8'
+        APP_DIR = '/home/ubuntu/todo-app'
+        PYTHON_BIN = '/usr/bin/python3'
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                withCredentials([string(credentialsId: 'git-repo-token', variable: 'GITHUB_TOKEN')]) {
+                    sh '''
+                    echo "Cloning repository..."
+                    rm -rf to-do-list-practise  # Clean previous build if exists
+                    git clone https://$GITHUB_TOKEN@github.com/mh-manognyachindam/django-on-ec2.git
+                    cd django-on-ec2
+                    '''
+                }
+            }
+        }
+
+        stage('Run Pylint Checks') {
+            steps {
+                sh '''
+                echo "Running Pylint Checks..."
+                chmod +x pylint.sh || true
+                ./pylint.sh || echo "Pylint warnings found, review the logs."
+                '''
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(['858d053b-55ec-4c46-9cb6-22f757cae15c']) {
+                    sh '''
+                    echo "Transferring application files to EC2..."
+                    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
+                    scp -o StrictHostKeyChecking=no -r django-on-ec2/* $EC2_USER@$EC2_HOST:$APP_DIR
+
+                    echo "Starting application using Uvicorn..."
+                    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
+                    cd $APP_DIR
+                    if [ ! -d "venv" ]; then
+                        echo "Creating virtual environment..."
+                        python3 -m venv venv
+                    fi
+                    source venv/bin/activate
+                    pip install -r requirements.txt
+
+                    echo "Restarting Uvicorn if already running..."
+                    pkill -f "uvicorn" || true
+                    
+                    echo "Starting Uvicorn..."
+                    nohup uvicorn app:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
+                    EOF
+                    '''
+                }
+            }
+        }
+    }
+}
