@@ -18,4 +18,4 @@ echo "Starting application.........."
 nohup $PYTHON_BIN "$APP_FILE" > app.log 2>&1 &
 
 
-echo "✅ Deployment successful!"
+echo "✅ Deployment successfull!"
