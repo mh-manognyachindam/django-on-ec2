@@ -11,13 +11,12 @@ pipeline {
     }
 
     stages {
-
         stage('Clone Repository') {
             steps {
-                withCredentials([string(credentialsId: 'todo-github', variable: 'GITHUB_TOKEN')]) {
+               withCredentials([string(credentialsId: 'todo-github', variable: 'GITHUB_TOKEN')]) {
                     sh '''
                     echo "Cloning repository..."
-                    rm -rf django-on-ec2  # Clean previous build if exists
+                    rm -rf django-on-ec2
                     git clone https://$GITHUB_TOKEN@github.com/mh-manognyachindam/django-on-ec2.git
                     cd django-on-ec2
                     '''
@@ -43,21 +42,11 @@ pipeline {
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
                     scp -o StrictHostKeyChecking=no -r django-on-ec2/* $EC2_USER@$EC2_HOST:$APP_DIR
 
-                    echo "Starting application using Uvicorn..."
+                    echo "Running pylint.sh on EC2..."
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
                     cd $APP_DIR
-                    if [ ! -d "venv" ]; then
-                        echo "Creating virtual environment..."
-                        python3 -m venv venv
-                    fi
-                    source venv/bin/activate
-                    pip install -r requirements.txt
-
-                    echo "Restarting Uvicorn if already running..."
-                    pkill -f "uvicorn" || true
-                    
-                    echo "Starting Uvicorn..."
-                    nohup uvicorn app:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
+                    chmod +x pylint.sh
+                    ./pylint.sh
                     EOF
                     '''
                 }
