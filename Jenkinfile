@@ -47,9 +47,9 @@ echo "Transferring application files to EC2 using rsync..."
 rsync -avz --exclude '.git' -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" ./ $EC2_USER@$EC2_HOST:$APP_DIR || echo "❌ rsync transfer failed."
 
 echo "Running Deployment Steps on EC2..."
-ssh -tt -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
+ssh -tt -o StrictHostKeyChecking=no -i **** ubuntu@18.234.185.185 bash -c "
 set -e
-cd $APP_DIR
+cd /home/ubuntu/jenkins/jenkins/workspace/ngo-ToDo-Direct-Pipeline_develop
 
 # Verify pylint.sh exists
 if [ -f pylint.sh ]; then
@@ -69,8 +69,8 @@ else
     echo '❌ manage.py not found. Check project structure.'
     exit 1
 fi
+"
 
-                    '''
                 }
             }
         }
