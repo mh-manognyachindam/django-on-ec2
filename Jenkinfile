@@ -59,6 +59,15 @@ if [ -f pylint.sh ]; then
 else
     echo '❌ pylint.sh not found on EC2.'
 fi
+
+echo 'Installing dependencies...'
+$PYTHON_BIN -m pip install -r requirements.txt
+
+echo 'Running migrations...'
+$PYTHON_BIN manage.py migrate
+
+echo 'Starting Django server...'
+nohup $PYTHON_BIN manage.py runserver 0.0.0.0:8000 &
 "
 
 echo "✅ Deployment Successful!"
