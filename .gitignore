@@ -5,9 +5,15 @@ __pycache__/
 # C extensions
 *.so
 
+# Virtual environment
+env/
+venv/
+ENV/
+.venv/
+.VENV/
+
 # Distribution / packaging
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -24,8 +30,6 @@ var/
 *.egg
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -47,13 +51,61 @@ coverage.xml
 *.mo
 *.pot
 
-# Django stuff:
+# Django-related
 *.log
+db.sqlite3
+*.sqlite3
+*.pyc
+media/
+staticfiles/
+static/
+local_settings.py
+.env
+.env.*
 
-# Sphinx documentation
-docs/_build/
+# Jenkins-related
+workspace/
+*.log
+*.pid
+*.seed
+*.bak
+logs/
+jenkins.out
+jenkins.err
+nohup.out
 
-# PyBuilder
-target/
+# AWS/EC2-related
+*.pem
+*.key
+*.crt
+ec2-key.pem
+instance-config.json
 
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+
+# macOS system files
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Node-related (if using React/Vite for frontend)
+node_modules/
+*.log
+npm-debug.log
+yarn-error.log
+
+# Misc
+*.bak
+*.orig
+*.rej
