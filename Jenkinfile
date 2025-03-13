@@ -6,7 +6,7 @@ pipeline {
         AWS_REGION = 'us-east-1'
         EC2_USER = 'ubuntu'
         EC2_HOST = '18.234.185.185'
-        APP_DIR = '/home/ubuntu/todo-app'
+        APP_DIR = '/home/ubuntu/jenkins/jenkins/workspace/ngo-ToDo-Direct-Pipeline_develop'  // Updated Path
         PYTHON_BIN = '/usr/bin/python3'
     }
 
@@ -48,7 +48,7 @@ pipeline {
 
                     echo "Transferring application files to EC2..."
                     scp -o StrictHostKeyChecking=no -i $SSH_KEY -r . $EC2_USER@$EC2_HOST:$APP_DIR
-      
+          
                     echo "Running Pylint Checks on EC2..."
                     ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST << EOF
                     set -e
@@ -68,4 +68,3 @@ pipeline {
         }
     }
 }
-
