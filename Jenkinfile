@@ -21,11 +21,12 @@ pipeline {
             steps {
                 sh '''
                 echo "Running Pylint Checks on Jenkins..."
-                if [ -f pylint.sh ]; then
-                    chmod +x pylint.sh
+                if [ -f ./pylint.sh ]; then
+                    chmod +x ./pylint.sh
                     ./pylint.sh || echo "Pylint warnings found, review the logs."
                 else
                     echo "pylint.sh not found in repository."
+                    ls -la  # Display files for debugging
                 fi
                 '''
             }
@@ -33,18 +34,23 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['d1c7a6e0-3239-4488-a6da-520ac8757e2b']) {
+                script {
+                    if (!fileExists('pylint.sh')) {
+                        error("❌ ERROR: pylint.sh not found in the workspace.")
+                    }
+                }
+                withCredentials([sshUserPrivateKey(credentialsId: 'd1c7a6e0-3239-4488-a6da-520ac8757e2b', keyFileVariable: 'SSH_KEY')]) {
                     sh '''
                     set -e  # Stop on error
 
                     echo "Creating app directory on EC2..."
-                    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
+                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
 
                     echo "Transferring application files to EC2..."
-                    scp -o StrictHostKeyChecking=no -r . $EC2_USER@$EC2_HOST:$APP_DIR
+                    scp -o StrictHostKeyChecking=no -i $SSH_KEY -r . $EC2_USER@$EC2_HOST:$APP_DIR
       
                     echo "Running Pylint Checks on EC2..."
-                    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
+                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST << EOF
                     set -e
                     cd $APP_DIR
                     if [ -f pylint.sh ]; then
@@ -55,10 +61,11 @@ pipeline {
                     fi
                     EOF
 
-                    echo "Deployment Successful!"
+                    echo "✅ Deployment Successful!"
                     '''
                 }
             }
         }
     }
 }
+
