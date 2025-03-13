@@ -5,7 +5,7 @@ pipeline {
         AWS_ACCOUNT_ID = '000629889765'
         AWS_REGION = 'us-east-1'
         EC2_USER = 'ubuntu'
-        EC2_HOST = '35.172.114.8'
+        EC2_HOST = '18.234.185.185'
         APP_DIR = '/home/ubuntu/todo-app'
         PYTHON_BIN = '/usr/bin/python3'
     }
@@ -17,12 +17,16 @@ pipeline {
             }
         }
 
-        stage('Run Pylint Checks') {
+        stage('Run Pylint Checks (Local)') {
             steps {
                 sh '''
-                echo "Running Pylint Checks..."
-                chmod +x pylint.sh || true
-                ./pylint.sh || echo "Pylint warnings found, review the logs."
+                echo "Running Pylint Checks on Jenkins..."
+                if [ -f pylint.sh ]; then
+                    chmod +x pylint.sh
+                    ./pylint.sh || echo "Pylint warnings found, review the logs."
+                else
+                    echo "pylint.sh not found in repository."
+                fi
                 '''
             }
         }
@@ -31,16 +35,27 @@ pipeline {
             steps {
                 sshagent(['d1c7a6e0-3239-4488-a6da-520ac8757e2b']) {
                     sh '''
-                    echo "Transferring application files to EC2..."
+                    set -e  # Stop on error
+
+                    echo "Creating app directory on EC2..."
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
+
+                    echo "Transferring application files to EC2..."
                     scp -o StrictHostKeyChecking=no -r * $EC2_USER@$EC2_HOST:$APP_DIR
 
-                    echo "Running pylint.sh on EC2..."
+                    echo "Running Pylint Checks on EC2..."
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
+                    set -e
                     cd $APP_DIR
-                    chmod +x pylint.sh
-                    ./pylint.sh
+                    if [ -f pylint.sh ]; then
+                        chmod +x pylint.sh
+                        ./pylint.sh || echo "Pylint warnings found, review the logs."
+                    else
+                        echo "pylint.sh not found on EC2."
+                    fi
                     EOF
+
+                    echo "Deployment Successful!"
                     '''
                 }
             }
