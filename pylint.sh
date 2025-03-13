@@ -14,7 +14,7 @@ APP_FILE="app.py"
 cd "$APP_DIR"
 
 # Start the application
-echo "Starting application.............."
+echo "Starting application..........."
 nohup $PYTHON_BIN "$APP_FILE" > app.log 2>&1 &
 
 
