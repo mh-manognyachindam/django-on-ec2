@@ -33,12 +33,6 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                script {
-                    if (!fileExists('pylint.sh')) {
-                        echo "❌ WARNING: pylint.sh not found in the workspace. Skipping pylint checks."
-                    }
-                }
-
                 withCredentials([sshUserPrivateKey(credentialsId: 'd1c7a6e0-3239-4488-a6da-520ac8757e2b', keyFileVariable: 'SSH_KEY')]) {
                     sh '''
                     set -e  # Stop on error
@@ -52,10 +46,12 @@ ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST "sudo chown -R u
 echo "Transferring application files to EC2 using rsync..."
 rsync -avz --exclude '.git' -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" ./ $EC2_USER@$EC2_HOST:$APP_DIR || echo "❌ rsync transfer failed."
 
-echo "Running Pylint Checks on EC2..."
+echo "Running Deployment Steps on EC2..."
 ssh -tt -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
 set -e
 cd $APP_DIR
+
+# Verify pylint.sh exists
 if [ -f pylint.sh ]; then
     chmod +x pylint.sh
     ./pylint.sh | tee pylint.log || echo 'Pylint warnings found, review pylint.log.'
@@ -63,16 +59,16 @@ else
     echo '❌ pylint.sh not found on EC2.'
 fi
 
-echo 'Installing dependencies...'
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-echo 'Running migrations...'
-python manage.py migrate
-
-echo 'Starting Django server...'
-nohup python manage.py runserver 0.0.0.0:8000 &
+# Run Django migrations
+if [ -f manage.py ]; then
+    echo 'Running migrations...'
+    python manage.py migrate
+    echo 'Starting Django server...'
+    nohup python manage.py runserver 0.0.0.0:8000 &
+else
+    echo '❌ manage.py not found. Check project structure.'
+    exit 1
+fi
 "
                     '''
                 }
