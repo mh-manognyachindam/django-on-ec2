@@ -41,8 +41,8 @@ pipeline {
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
 
                     echo "Transferring application files to EC2..."
-                    scp -o StrictHostKeyChecking=no -r * $EC2_USER@$EC2_HOST:$APP_DIR
-
+                    scp -o StrictHostKeyChecking=no -r . $EC2_USER@$EC2_HOST:$APP_DIR
+      
                     echo "Running Pylint Checks on EC2..."
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
                     set -e
