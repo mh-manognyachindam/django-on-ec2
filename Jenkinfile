@@ -23,7 +23,7 @@ pipeline {
                 echo "Running Pylint Checks on Jenkins..."
                 if [ -f ./pylint.sh ]; then
                     chmod +x ./pylint.sh
-                    ./pylint.sh || echo "Pylint warnings found, review the logs."
+                    ./pylint.sh | tee pylint.log || echo "Pylint warnings found, review pylint.log."
                 else
                     echo "❌ pylint.sh not found in repository."
                     ls -la  # Display files for debugging
@@ -43,25 +43,26 @@ pipeline {
                     sh '''
                     set -e  # Stop on error
 
-                    echo "Creating app directory on EC2..."
-                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
+echo "Creating app directory on EC2..."
+ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
 
-                    echo "Transferring application files to EC2..."
-                    scp -o StrictHostKeyChecking=no -i $SSH_KEY -r $(ls -A | grep -v '.git') $EC2_USER@$EC2_HOST:$APP_DIR
-          
-                    echo "Running Pylint Checks on EC2..."
-                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST << EOF
-                    set -e
-                    cd $APP_DIR
-                    if [ -f pylint.sh ]; then
-                        chmod +x pylint.sh
-                        ./pylint.sh || echo "Pylint warnings found, review the logs."
-                    else
-                        echo "❌ pylint.sh not found on EC2."
-                    fi
-                    EOF
+echo "Transferring application files to EC2 using rsync..."
+rsync -avz --exclude '.git' -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" ./ $EC2_USER@$EC2_HOST:$APP_DIR || echo "❌ rsync transfer failed."
 
-                    echo "✅ Deployment Successful!"
+echo "Running Pylint Checks on EC2..."
+ssh -tt -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
+set -e
+cd $APP_DIR
+if [ -f pylint.sh ]; then
+    chmod +x pylint.sh
+    ./pylint.sh | tee pylint.log || echo 'Pylint warnings found, review pylint.log.'
+else
+    echo '❌ pylint.sh not found on EC2.'
+fi
+"
+
+echo "✅ Deployment Successful!"
+
                     '''
                 }
             }
