@@ -34,22 +34,10 @@ pipeline {
         stage('Deploy to EC2') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'd1c7a6e0-3239-4488-a6da-520ac8757e2b', keyFileVariable: 'SSH_KEY')]) {
-                    sh '''
-                    set -e  # Stop on error
-
-echo "Creating app directory on EC2..."
-ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST "mkdir -p $APP_DIR"
-
-echo "Setting correct permissions..."
-ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST "sudo chown -R ubuntu:ubuntu $APP_DIR"
-
-echo "Transferring application files to EC2 using rsync..."
-rsync -avz --exclude '.git' -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" ./ $EC2_USER@$EC2_HOST:$APP_DIR || echo "❌ rsync transfer failed."
-
-echo "Running Deployment Steps on EC2..."
-ssh -tt -o StrictHostKeyChecking=no -i **** ubuntu@18.234.185.185 bash -c "
+                   sh '''
+ssh -tt -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
 set -e
-cd /home/ubuntu/jenkins/jenkins/workspace/ngo-ToDo-Direct-Pipeline_develop
+cd $APP_DIR
 
 # Verify pylint.sh exists
 if [ -f pylint.sh ]; then
@@ -71,6 +59,7 @@ else
 fi
 "
 '''
+
                 }
             }
         }
