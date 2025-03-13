@@ -62,14 +62,14 @@ fi
 # Run Django migrations
 if [ -f manage.py ]; then
     echo 'Running migrations...'
-    python manage.py migrate
+    python3 manage.py migrate
     echo 'Starting Django server...'
-    nohup python manage.py runserver 0.0.0.0:8000 &
+    nohup python3 manage.py runserver 0.0.0.0:8000 &
 else
     echo '❌ manage.py not found. Check project structure.'
     exit 1
 fi
-"
+
                     '''
                 }
             }
