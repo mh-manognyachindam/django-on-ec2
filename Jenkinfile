@@ -24,7 +24,7 @@ pipeline {
         stage('Run Pylint Checks (Local)') {
             steps {
                 sh '''
-                echo "🔎 Running Pylint Checks on Jenkins (Local)..."
+                echo "🔎 Running Pylint Checks on Jenkins (Local)....."
                 if [ -f ./pylint.sh ]; then
                     chmod +x ./pylint.sh
                     ./pylint.sh | tee pylint.log || echo "⚠️ Pylint warnings found, review pylint.log."
