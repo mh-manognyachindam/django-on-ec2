@@ -13,19 +13,23 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                checkout scm
+                withCredentials([usernamePassword(credentialsId: 'githubcredential', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                    sh '''
+                    git clone https://$GIT_USER:$GIT_TOKEN@github.com/mh-manognyachindam/django-on-ec2.git $APP_DIR
+                    '''
+                }
             }
         }
 
         stage('Run Pylint Checks (Local)') {
             steps {
                 sh '''
-                echo "Running Pylint Checks on Jenkins..."
+                echo "🔎 Running Pylint Checks on Jenkins (Local)..."
                 if [ -f ./pylint.sh ]; then
                     chmod +x ./pylint.sh
-                    ./pylint.sh | tee pylint.log || echo "Pylint warnings found, review pylint.log."
+                    ./pylint.sh | tee pylint.log || echo "⚠️ Pylint warnings found, review pylint.log."
                 else
-                    echo "❌ pylint.sh not found in repository. Skipping local pylint checks......."
+                    echo "❌ pylint.sh not found in repository. Skipping local pylint checks..."
                 fi
                 '''
             }
@@ -34,32 +38,32 @@ pipeline {
         stage('Deploy to EC2') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'd1c7a6e0-3239-4488-a6da-520ac8757e2b', keyFileVariable: 'SSH_KEY')]) {
-                   sh '''
-ssh -tt -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
-set -e
-cd $APP_DIR
+                    sh '''
+                    ssh -tt -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
+                    set -e
+                    cd $APP_DIR
 
-# Verify pylint.sh exists
-if [ -f pylint.sh ]; then
-    chmod +x pylint.sh
-    ./pylint.sh | tee pylint.log || echo 'Pylint warnings found, review pylint.log.'
-else
-    echo '❌ pylint.sh not found on EC2.'
-fi
+                    echo '🔎 Checking for pylint.sh on EC2...'
+                    if [ -f pylint.sh ]; then
+                        chmod +x pylint.sh
+                        ./pylint.sh | tee pylint.log || echo '⚠️ Pylint warnings found, review pylint.log.'
+                    else
+                        echo '❌ pylint.sh not found on EC2.'
+                    fi
 
-# Run Django migrations
-if [ -f manage.py ]; then
-    echo 'Running migrations...'
-    python3 manage.py migrate
-    echo 'Starting Django server...'
-    nohup python3 manage.py runserver 0.0.0.0:8000 &
-else
-    echo '❌ manage.py not found. Check project structure.'
-    exit 1
-fi
-"
-'''
-
+                    echo '🔎 Checking for manage.py on EC2...'
+                    if [ -f manage.py ]; then
+                        echo '🚀 Running Django migrations...'
+                        python3 manage.py migrate
+                        echo '✅ Migrations complete.'
+                        echo '🚀 Starting Django server...'
+                        nohup python3 manage.py runserver 0.0.0.0:8000 &
+                    else
+                        echo '❌ manage.py not found. Check project structure.'
+                        exit 1
+                    fi
+                    "
+                    '''
                 }
             }
         }
