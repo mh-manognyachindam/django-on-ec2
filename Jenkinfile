@@ -57,14 +57,16 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-                script {
-                    try {
-                        sh '''
-                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-                        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                        '''
-                    } catch (Exception e) {
-                        error "❌ ECR Push Failed: ${e.message}"
+                withAWS(credentials: 'awscredentials', region: "${AWS_REGION}") {
+                    script {
+                        try {
+                            sh '''
+                            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                            docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                            '''
+                        } catch (Exception e) {
+                            error "❌ ECR Push Failed: ${e.message}"
+                        }
                     }
                 }
             }
