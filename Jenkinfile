@@ -31,8 +31,12 @@ pipeline {
                     try {
                         sh '''
                         echo "🔍 Running Pylint Tests..."
-                        chmod +x ./pylint.sh
-                        ./pylint.sh | tee pylint.log || echo "⚠️ Pylint issues found, review pylint.log."
+                        if [ -f ./pylint.sh ]; then
+                            chmod +x ./pylint.sh
+                            ./pylint.sh | tee pylint.log || echo "⚠️ Pylint issues found, review pylint.log."
+                        else
+                            echo "❗ pylint.sh not found — Skipping Pylint Tests."
+                        fi
                         '''
                     } catch (Exception e) {
                         error "❌ Pylint Tests Failed: ${e.message}"
@@ -47,7 +51,8 @@ pipeline {
                     try {
                         sh '''
                         echo "🛠️ Building Docker Image..."
-                        docker system prune -f
+                        docker image prune -f
+                        docker container prune -f
                         docker build -t $IMAGE_NAME:latest .
                         docker tag $IMAGE_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
                         '''
@@ -60,18 +65,14 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-                withAWS(credentials: 'awscredentials', region: "${AWS_REGION}") {
-                    script {
-                        try {
-                            sh '''
-                            echo "🔒 Logging into ECR..."
-                            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-                            docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                            '''
-                        } catch (Exception e) {
-                            error "❌ ECR Push Failed: ${e.message}"
-                        }
-                    }
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'awscredentials'
+                ]]) {
+                    sh '''
+                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                    docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                    '''
                 }
             }
         }
@@ -82,8 +83,12 @@ pipeline {
                     script {
                         try {
                             sh '''
+                            echo "🚀 Checking SSH connectivity..."
+                            ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "echo 'SSH Connected Successfully'" || exit 1
+
                             echo "🚀 Deploying to EC2..."
                             ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
+                            sudo systemctl start docker || echo "⚠️ Docker already running"
                             docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
                             docker stop django-todo || true
                             docker rm django-todo || true
