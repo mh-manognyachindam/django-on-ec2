@@ -1,81 +1,101 @@
 pipeline {
-    agent { label 'testing-lable' }
+    agent any
 
     environment {
         AWS_ACCOUNT_ID = '000629889765'
         AWS_REGION = 'us-east-1'
+        IMAGE_NAME = 'django-todo'
+        ECR_REPO = 'todo-ecr-repo'
         EC2_USER = 'ubuntu'
-        EC2_HOST = '3.83.66.140'
-        APP_DIR = '/home/ubuntu/jenkins/jenkins/workspace/ngo-ToDo-Direct-Pipeline_develop'
-        PYTHON_BIN = '/usr/bin/python3'
+        EC2_HOST = '44.201.139.171'
+        SSH_KEY = '/var/lib/jenkins/.ssh/pro2.pem'
     }
 
     stages {
-        stage('Clean Workspace') {
-            steps {
-                sh 'rm -rf $APP_DIR/* $APP_DIR/.* || true'   // 🔥 Now includes hidden files like .git
-            }
-        }
-
         stage('Checkout Code') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'githubcredential', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
-                    sh '''
-                    if [ -d "$APP_DIR/.git" ]; then
-                        echo "⚠️ Previous .git folder found. Removing it..."
-                        rm -rf $APP_DIR/.git
-                    fi
-                    git clone https://$GIT_USER:$GIT_TOKEN@github.com/mh-manognyachindam/django-on-ec2.git $APP_DIR
-                    '''
+                script {
+                    try {
+                        checkout scm
+                    } catch (Exception e) {
+                        error "❌ Code Checkout Failed: ${e.message}"
+                    }
                 }
             }
         }
 
-        stage('Run Pylint Checks (Local)') {
+        stage('Run Pylint Tests') {
             steps {
-                sh '''
-                echo "🔎 Running Pylint Checks on Jenkins (Local)........"
-                if [ -f ./pylint.sh ]; then
-                    chmod +x ./pylint.sh
-                    ./pylint.sh | tee pylint.log || echo "⚠️ Pylint warnings found, review pylint.log."
-                else
-                    echo "❌ pylint.sh not found in repository. Skipping local pylint checks..."
-                fi
-                '''
+                script {
+                    try {
+                        sh '''
+                        chmod +x ./pylint.sh
+                        ./pylint.sh | tee pylint.log || echo "❌ Pylint issues found, review pylint.log."
+                        '''
+                    } catch (Exception e) {
+                        error "❌ Pylint Tests Failed: ${e.message}"
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                        docker system prune -f
+                        docker build -t $IMAGE_NAME:latest .
+                        docker tag $IMAGE_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        '''
+                    } catch (Exception e) {
+                        error "❌ Docker Build Failed: ${e.message}"
+                    }
+                }
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        '''
+                    } catch (Exception e) {
+                        error "❌ ECR Push Failed: ${e.message}"
+                    }
+                }
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'd1c7a6e0-3239-4488-a6da-520ac8757e2b', keyFileVariable: 'SSH_KEY')]) {
-                    sh '''
-                    ssh -tt -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
-                    set -e
-                    cd $APP_DIR
-
-                    echo '🔎 Checking for pylint.sh on EC2...'
-                    if [ -f pylint.sh ]; then
-                        chmod +x pylint.sh
-                        ./pylint.sh | tee pylint.log || echo '⚠️ Pylint warnings found, review pylint.log.'
-                    else
-                        echo '❌ pylint.sh not found on EC2.'
-                    fi
-
-                    echo '🔎 Checking for manage.py on EC2...'
-                    if [ -f manage.py ]; then
-                        echo '🚀 Running Django migrations...'
-                        python3 manage.py migrate
-                        echo '✅ Migrations complete.'
-                        echo '🚀 Starting Django server...'
-                        nohup python3 manage.py runserver 0.0.0.0:8000 &
-                    else
-                        echo '❌ manage.py not found. Check project structure.'
-                        exit 1
-                    fi
-                    "
-                    '''
+                script {
+                    try {
+                        sh '''
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST << EOF
+                        docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        docker stop django-todo || true
+                        docker rm django-todo || true
+                        docker run -d --name django-todo -p 8000:8000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        EOF
+                        '''
+                    } catch (Exception e) {
+                        error "❌ Deployment Failed: ${e.message}"
+                    }
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo '🟢 Pipeline Completed!'
+        }
+        failure {
+            echo '❗ Pipeline Failed — Please Check Logs.'
         }
     }
 }
