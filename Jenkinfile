@@ -30,7 +30,7 @@ pipeline {
                 script {
                     try {
                         sh '''
-                        echo "🔍 Running Pylint Tests..."
+                        echo "🔍 Running Pylint Tests....."
                         if [ -f ./pylint.sh ]; then
                             chmod +x ./pylint.sh
                             ./pylint.sh | tee pylint.log || echo "⚠️ Pylint issues found, review pylint.log."
