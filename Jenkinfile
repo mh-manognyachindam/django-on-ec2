@@ -14,12 +14,21 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                script {
-                    try {
-                        checkout scm
-                        echo "✅ Code checkout successful."
-                    } catch (Exception e) {
-                        error "❌ Code Checkout Failed: ${e.message}"
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-credentials',  // Add your GitHub credential ID
+                    usernameVariable: 'GIT_USERNAME',
+                    passwordVariable: 'GIT_PASSWORD'
+                )]) {
+                    script {
+                        try {
+                            sh '''
+                            git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/mh-manognyachindam/django-on-ec2.git
+                            cd <your-repo> || exit 1
+                            echo "✅ Code checkout successful."
+                            '''
+                        } catch (Exception e) {
+                            error "❌ Code Checkout Failed: ${e.message}"
+                        }
                     }
                 }
             }
