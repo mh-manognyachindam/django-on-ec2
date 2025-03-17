@@ -21,7 +21,7 @@ pipeline {
                 )]) {
                     script {
                         sh '''
-                        set -e  # Stop execution on error
+                        set -e  
                         echo "🔄 Cleaning up old repo..."
                         rm -rf django-on-ec2
                         echo "🔄 Cloning repository..."
@@ -94,10 +94,18 @@ pipeline {
                         echo "🚀 Deploying to EC2..."
                         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
                         set -e
+                        echo "🔄 Ensuring Docker is running..."
                         sudo systemctl start docker || echo "⚠️ Docker already running"
+
+                        echo "📥 Pulling latest image..."
                         docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                        docker stop django-todo || true
-                        docker rm django-todo || true
+
+                        echo "🛑 Stopping existing container (if running)..."
+                        if [ "$(docker ps -q -f name=django-todo)" ]; then
+                            docker stop django-todo && docker rm django-todo
+                        fi
+
+                        echo "🚀 Running new container..."
                         docker run -d --name django-todo -p 8000:8000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
                         EOF
                         '''
