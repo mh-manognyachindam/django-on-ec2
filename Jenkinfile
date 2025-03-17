@@ -8,7 +8,7 @@ pipeline {
         ECR_REPO = 'todo-ecr-repo'
         EC2_USER = 'ubuntu'
         EC2_HOST = '44.201.139.171'
-        SSH_KEY = '/var/lib/jenkins/.ssh/pro2.pem'
+        SSH_CREDENTIAL_ID = 'd1c7a6e0-3239-4488-a6da-520ac8757e2b'
     }
 
     stages {
@@ -17,6 +17,7 @@ pipeline {
                 script {
                     try {
                         checkout scm
+                        echo "✅ Code checkout successful."
                     } catch (Exception e) {
                         error "❌ Code Checkout Failed: ${e.message}"
                     }
@@ -29,8 +30,9 @@ pipeline {
                 script {
                     try {
                         sh '''
+                        echo "🔍 Running Pylint Tests..."
                         chmod +x ./pylint.sh
-                        ./pylint.sh | tee pylint.log || echo "❌ Pylint issues found, review pylint.log."
+                        ./pylint.sh | tee pylint.log || echo "⚠️ Pylint issues found, review pylint.log."
                         '''
                     } catch (Exception e) {
                         error "❌ Pylint Tests Failed: ${e.message}"
@@ -44,6 +46,7 @@ pipeline {
                 script {
                     try {
                         sh '''
+                        echo "🛠️ Building Docker Image..."
                         docker system prune -f
                         docker build -t $IMAGE_NAME:latest .
                         docker tag $IMAGE_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
@@ -61,6 +64,7 @@ pipeline {
                     script {
                         try {
                             sh '''
+                            echo "🔒 Logging into ECR..."
                             aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
                             docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
                             '''
@@ -74,18 +78,21 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                script {
-                    try {
-                        sh '''
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $EC2_USER@$EC2_HOST << EOF
-                        docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                        docker stop django-todo || true
-                        docker rm django-todo || true
-                        docker run -d --name django-todo -p 8000:8000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                        EOF
-                        '''
-                    } catch (Exception e) {
-                        error "❌ Deployment Failed: ${e.message}"
+                sshagent(['d1c7a6e0-3239-4488-a6da-520ac8757e2b']) {
+                    script {
+                        try {
+                            sh '''
+                            echo "🚀 Deploying to EC2..."
+                            ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
+                            docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                            docker stop django-todo || true
+                            docker rm django-todo || true
+                            docker run -d --name django-todo -p 8000:8000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                            EOF
+                            '''
+                        } catch (Exception e) {
+                            error "❌ Deployment Failed: ${e.message}"
+                        }
                     }
                 }
             }
