@@ -15,20 +15,20 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'githubcredential',  // Add your GitHub credential ID
+                    credentialsId: 'githubcredential',
                     usernameVariable: 'GIT_USERNAME',
                     passwordVariable: 'GIT_PASSWORD'
                 )]) {
                     script {
-                        try {
-                            sh '''
-                            git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/mh-manognyachindam/django-on-ec2.git
-                            cd <your-repo> || exit 1
-                            echo "✅ Code checkout successful."
-                            '''
-                        } catch (Exception e) {
-                            error "❌ Code Checkout Failed: ${e.message}"
-                        }
+                        sh '''
+                        set -e  # Stop execution on error
+                        echo "🔄 Cleaning up old repo..."
+                        rm -rf django-on-ec2
+                        echo "🔄 Cloning repository..."
+                        git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/mh-manognyachindam/django-on-ec2.git
+                        cd django-on-ec2
+                        echo "✅ Code checkout successful."
+                        '''
                     }
                 }
             }
@@ -37,19 +37,16 @@ pipeline {
         stage('Run Pylint Tests') {
             steps {
                 script {
-                    try {
-                        sh '''
-                        echo "🔍 Running Pylint Tests....."
-                        if [ -f ./pylint.sh ]; then
-                            chmod +x ./pylint.sh
-                            ./pylint.sh | tee pylint.log || echo "⚠️ Pylint issues found, review pylint.log."
-                        else
-                            echo "❗ pylint.sh not found — Skipping Pylint Tests."
-                        fi
-                        '''
-                    } catch (Exception e) {
-                        error "❌ Pylint Tests Failed: ${e.message}"
-                    }
+                    sh '''
+                    set -e
+                    echo "🔍 Running Pylint Tests..."
+                    if [ -f ./pylint.sh ]; then
+                        chmod +x ./pylint.sh
+                        ./pylint.sh | tee pylint.log || echo "⚠️ Pylint issues found, review pylint.log."
+                    else
+                        echo "❗ pylint.sh not found — Skipping Pylint Tests."
+                    fi
+                    '''
                 }
             }
         }
@@ -57,56 +54,53 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    try {
-                        sh '''
-                        echo "🛠️ Building Docker Image..."
-                        docker image prune -f
-                        docker container prune -f
-                        docker build -t $IMAGE_NAME:latest .
-                        docker tag $IMAGE_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                        '''
-                    } catch (Exception e) {
-                        error "❌ Docker Build Failed: ${e.message}"
-                    }
+                    sh '''
+                    set -e
+                    echo "🛠️ Building Docker Image..."
+                    docker image prune -f
+                    docker container prune -f
+                    docker build -t $IMAGE_NAME:latest .
+                    docker tag $IMAGE_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                    '''
                 }
             }
         }
 
         stage('Push to ECR') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding', 
-                    credentialsId: 'awscredentials'
-                ]]) {
-                    sh '''
-                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-                    docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                    '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscredentials']]) {
+                    script {
+                        sh '''
+                        set -e
+                        echo "🔑 Logging into AWS ECR..."
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                        echo "📤 Pushing Docker Image to ECR..."
+                        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        '''
+                    }
                 }
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['d1c7a6e0-3239-4488-a6da-520ac8757e2b']) {
+                sshagent([SSH_CREDENTIAL_ID]) {
                     script {
-                        try {
-                            sh '''
-                            echo "🚀 Checking SSH connectivity..."
-                            ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "echo 'SSH Connected Successfully'" || exit 1
+                        sh '''
+                        set -e
+                        echo "🚀 Checking SSH connectivity..."
+                        ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "echo 'SSH Connected Successfully'"
 
-                            echo "🚀 Deploying to EC2..."
-                            ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
-                            sudo systemctl start docker || echo "⚠️ Docker already running"
-                            docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                            docker stop django-todo || true
-                            docker rm django-todo || true
-                            docker run -d --name django-todo -p 8000:8000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                            EOF
-                            '''
-                        } catch (Exception e) {
-                            error "❌ Deployment Failed: ${e.message}"
-                        }
+                        echo "🚀 Deploying to EC2..."
+                        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
+                        set -e
+                        sudo systemctl start docker || echo "⚠️ Docker already running"
+                        docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        docker stop django-todo || true
+                        docker rm django-todo || true
+                        docker run -d --name django-todo -p 8000:8000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        EOF
+                        '''
                     }
                 }
             }
