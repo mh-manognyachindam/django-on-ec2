@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         AWS_ACCOUNT_ID = '000629889765'
-        AWS_REGION = 'us-east-1a'
+        AWS_REGION = 'us-east-1'
         IMAGE_NAME = 'django-todo'
         ECR_REPO = 'todo-ecr-repo'
         EC2_USER = 'ubuntu'
