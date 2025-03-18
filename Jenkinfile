@@ -21,7 +21,11 @@ pipeline {
                 )]) {
                     sh '''
                     echo "🔄 Cloning repository..."
-                    git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/mh-manognyachindam/django-on-ec2.git || (cd django-on-ec2 && git pull)
+                    if [ ! -d "django-on-ec2" ]; then
+                        git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/mh-manognyachindam/django-on-ec2.git
+                    else
+                        cd django-on-ec2 && git pull
+                    fi
                     '''
                 }
             }
@@ -61,9 +65,14 @@ pipeline {
                 sshagent([SSH_CREDENTIAL_ID]) {
                     sh '''
                     echo "🚀 Deploying to EC2..."
-                    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
+                    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
+                    set -e
+                    
                     echo "📥 Pulling latest image..."
-                    docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                    AWS_ACCOUNT_ID='$AWS_ACCOUNT_ID'
+                    AWS_REGION='$AWS_REGION'
+                    ECR_REPO='$ECR_REPO'
+                    docker pull \$AWS_ACCOUNT_ID.dkr.ecr.\$AWS_REGION.amazonaws.com/\$ECR_REPO:latest
 
                     echo "🧹 Cleaning up old containers..."
                     docker container prune -f
@@ -72,7 +81,7 @@ pipeline {
                     docker ps -q --filter "name=django-todo" | grep -q . && docker stop django-todo && docker rm django-todo
 
                     echo "🚀 Running new container..."
-                    docker run -d --name django-todo -p 8000:8000 --restart unless-stopped $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                    docker run -d --name django-todo -p 8000:8000 --restart unless-stopped \$AWS_ACCOUNT_ID.dkr.ecr.\$AWS_REGION.amazonaws.com/\$ECR_REPO:latest
                     EOF
                     '''
                 }
