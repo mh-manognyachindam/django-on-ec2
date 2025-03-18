@@ -87,7 +87,7 @@ pipeline {
 
                         echo "🚀 Running new container..."
                         docker run -d --name django-todo -p 8000:8000 --restart unless-stopped $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                        EOF
+EOF
                         '''
                     }
                 }
