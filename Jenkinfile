@@ -21,8 +21,7 @@ pipeline {
                 )]) {
                     sh '''
                     echo "🔄 Cloning repository..."
-                    git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/mh-manognyachindam/django-on-ec2.git || echo "✅ Repository already cloned."
-                    cd django-on-ec2
+                    git clone https://$GIT_USERNAME:$GIT_PASSWORD@github.com/mh-manognyachindam/django-on-ec2.git || (cd django-on-ec2 && git pull)
                     '''
                 }
             }
@@ -32,9 +31,10 @@ pipeline {
             steps {
                 sh '''
                 echo "🔍 Running Pylint Tests..."
+                set -e
                 if [ -f ./pylint.sh ]; then
                     chmod +x ./pylint.sh
-                    ./pylint.sh | tee pylint.log || echo "⚠️ Pylint issues found, review pylint.log."
+                    ./pylint.sh | tee pylint.log
                 else
                     echo "❗ pylint.sh not found — Skipping Pylint Tests."
                 fi
@@ -47,6 +47,7 @@ pipeline {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscredentials']]) {
                     sh '''
                     echo "🛠️ Building and Pushing Docker Image..."
+                    cd django-on-ec2
                     aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
                     docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest .
                     docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
@@ -64,11 +65,14 @@ pipeline {
                     echo "📥 Pulling latest image..."
                     docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
 
+                    echo "🧹 Cleaning up old containers..."
+                    docker container prune -f
+
                     echo "🛑 Stopping existing container..."
                     docker ps -q --filter "name=django-todo" | grep -q . && docker stop django-todo && docker rm django-todo
 
                     echo "🚀 Running new container..."
-                    docker run -d --name django-todo -p 8000:8000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                    docker run -d --name django-todo -p 8000:8000 --restart unless-stopped $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
                     EOF
                     '''
                 }
