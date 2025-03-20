@@ -7,7 +7,7 @@ pipeline {
         IMAGE_NAME = 'django-todo'
         ECR_REPO = 'todo-ecr-repo'
         EC2_USER = 'ubuntu'
-        EC2_HOST = '3.92.137.2'
+        EC2_HOST = '54.204.204.77'
         SSH_CREDENTIAL_ID = 'd1c7a6e0-3239-4488-a6da-520ac8757e2b'
     }
 
